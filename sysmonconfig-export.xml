@@ -1320,12 +1320,10 @@
 
 		<!--DATA: RuleName, UtcTime, ProcessGuid, ProcessId, User, Image, TargetFilename, Hashes, IsExecutable, Archived -->
 
-	<!--
 	<RuleGroup name="" groupRelation="or">
 		<FileDelete onmatch="include">
 		</FileDelete>
 	</RuleGroup>
-	-->
 
 	<!--SYSMON EVENT ID 24 : CLIPBOARD EVENT MONITORING [ClipboardChange]-->
 		<!--EVENT 24: "Clipboard changed"-->
@@ -1334,7 +1332,6 @@
 
 		<!--DATA: EventType, UtcTime, ProcessGuid, ProcessId, Image, Session, ClientInfo, Hashes, Archived -->
 
-	<!--
 	<RuleGroup name="" groupRelation="or">
 		<ClipboardChange onmatch="include">
 			<Image condition="end with">wscript.exe</Image>
@@ -1343,7 +1340,6 @@
 			<Image condition="end with">rdpclip.exe</Image>
 		</ClipboardChange>
 	</RuleGroup>
-	-->
 
 	<!--SYSMON EVENT ID 25 : PROCESS TAMPERING [ProcessTampering]-->
 		<!--EVENT 25: "Process Tampering"-->
