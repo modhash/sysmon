@@ -1377,7 +1377,7 @@
 		-->
 
 	<RuleGroup name="ImageBlock" groupRelation="or">
-		<FileBlockExecutable onmatch="include">		
+		<FileBlockExecutable onmatch="include">
 			<!-- Executables double extensions -->
 			<TargetFilename condition="end with">.pdf.exe</TargetFilename>
 			<TargetFilename condition="end with">.doc.exe</TargetFilename>
