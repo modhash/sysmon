@@ -1,61 +1,18 @@
 <!--
 	sysmon-config | A Sysmon configuration focused on default high-quality event tracing and easy customization by the community
-	Source version:	74 | Date: 2021-07-08
 	Source project:	https://github.com/SwiftOnSecurity/sysmon-config
 	Source license:	Creative Commons Attribution 4.0 | You may privatize, fork, edit, teach, publish, or deploy for commercial use - with attribution in the text.
 
-	REQUIRED: Sysmon version 13 or higher (due to changes in syntax and bug-fixes)
+	WARNING: THIS CONFIG INCLUDES BLOCKING RULES THAT MAY CAUSE ISSUES ENDSYSTEMS!
+	         Test this configuration intensively before using it on productive systems
+
+	LAST CHANGE: 18.08.2022
+
+	REQUIRED: Sysmon version 14 or higher (due to changes in syntax and bug-fixes)
 		https://docs.microsoft.com/en-us/sysinternals/downloads/sysmon
-
-	NOTE: To collect Sysmon logs centrally for free, see https://aka.ms/WEF | Command to allow log access to the Network Service:
-		wevtutil.exe sl Microsoft-Windows-Sysmon/Operational /ca:O:BAG:SYD:(A;;0xf0005;;;SY)(A;;0x5;;;BA)(A;;0x1;;;S-1-5-32-573)(A;;0x1;;;NS)
-
-	NOTE: Do not let the size and complexity of this configuration discourage you from customizing it or building your own.
-		This configuration is based around known, high-signal event tracing, and thus appears complicated, but it is only very
-		detailed. Significant effort over years has been invested in front-loading as much filtering as possible onto the
-		client. This is to make analysis of intrusions possible by hand, and to try to surface anomalous activity as quickly
-		as possible to technicians armed only with Event Viewer. Its purpose is to democratize system monitoring for all organizations.
-
-	NOTE: Sysmon is NOT a whitelist solution or HIDS correlation engine, it is a computer change logging tool.
-		Do NOT ignore everything possible. Sysmon's purpose is providing context during a threat or problem investigation. Legitimate
-		processes are routinely used by threats - do not blindly exclude them. Additionally, be mindful of process-hollowing / imitation.
-
-	NOTE: By default this monitors DNS, which is extremely noisy. If you are starting out on your monitoring journey, just remove that section.
-		You can remove DNS events from Event Viewer screen by applying a 'Filter Current View' for event IDs of: -22
-		Additionally, if you want to monitor DNS, you should deploy client-side adblocking to reduce lookups. See the DNS section for info.
-
-	NOTE: This configuration is designed for PER-MACHINE installs of Chrome and OneDrive. That moves their binaries out of user-controlled folders.
-		Otherwise, attackers could imitate these common applications, and bypass your logging. Below are silent upgrades you can do, no user impact:
-		- https://docs.microsoft.com/en-us/onedrive/per-machine-installation
-		- https://cloud.google.com/chrome-enterprise/browser/download/
-		- As of 2021-02-16 there is no machine-level version of Microsoft Teams. The one provided copies itself to the user profile.
-
-	NOTE: Sysmon is not hardened against an attacker with admin rights. Additionally, this configuration offers an attacker, willing
-		to study it, limited ways to evade some of the logging. If you are in a very high-threat environment, you should consider a broader,
-		log-most approach. However, in the vast majority of cases, an attacker will bumble through multiple behavioral traps which
-		this configuration monitors, especially in the first minutes.
-
-	NOTE: If you encounter unexplainable event inclusion/exclusion, you may have a second Sysmon instance installed under a different exe filename.
-		To clear this, try downloading the latest version and uninstalling with -u force. If it hangs, kill the processes and run it again to cleanup.
-
-	TECHNICAL:
-	- Run sysmon.exe -? for a briefing on Sysmon configuration.
-	- Sysmon XML cannot use the AMPERSAND sign. Replace it with this: &amp;
-	- Sysmon 8+ can track which rule caused an event to be logged through the "RuleName" field.
-	- If you only specify exclude for a filtering subsection, everything in that subsection is logged by default.
-	- Some Sysmon monitoring abilities are not meant for widely deployed general-purpose use due to performance impact. Depends on environment.
-	- Duplicate or overlapping "Include" rules do not result in duplicate events being logged.
-	- All characters enclosed by XML tags are always interpreted literally. Sysmon does not support wildcards (*), alternate characters, or RegEx.
-	- In registry events, the value name is appended to the full key path with a "\" delimiter. Default key values are named "\(Default)"
-	- "Image" is a technical term for a compiled binary file like an EXE or DLL. Also, it can match just the filename, or entire path.
-	- "ProcessGuid" and "LoginGuid" are not random, they contain some embedded information. https://gist.github.com/mattifestation/0102042160c9a60b2b847378c0ef70b4
-
-	FILTERING: Filter conditions available for use are: is,is not,contains,contains any,contains all,excludes,excludes any,excludes all,begin with,end with,less than,more than,image
-	- The "image" filter is usable on any field. Same as "is" but can either match entire string, or only the text after last "\". Credit: @mattifestation
-
 -->
 
-<Sysmon schemaversion="4.50">
+<Sysmon schemaversion="4.82">
 	<!--SYSMON META CONFIG-->
 	<HashAlgorithms>md5,sha256,IMPHASH</HashAlgorithms> <!-- Both MD5 and SHA256 are the industry-standard algorithms. Remove IMPHASH if you do not use DLL import fingerprinting. -->
 	<CheckRevocation/> <!-- Check loaded drivers, log if their code-signing certificate has been revoked, in case malware stole one to sign a kernel driver -->
@@ -81,7 +38,6 @@
 			<!--SECTION: Microsoft Windows-->
 			<CommandLine condition="is">"C:\Windows\system32\cscript.exe" /nologo "MonitorKnowledgeDiscovery.vbs"</CommandLine>
 			<CommandLine condition="begin with"> "C:\Windows\system32\wermgr.exe" "-queuereporting_svc" </CommandLine> <!--Windows:Windows error reporting/telemetry-->
-			<CommandLine condition="begin with">C:\Windows\system32\DllHost.exe /Processid</CommandLine> <!--Windows-->
 			<CommandLine condition="begin with">C:\Windows\system32\wbem\wmiprvse.exe -Embedding</CommandLine> <!--Windows: WMI provider host-->
 			<CommandLine condition="begin with">C:\Windows\system32\wbem\wmiprvse.exe -secured -Embedding</CommandLine> <!--Windows: WMI provider host-->
 			<CommandLine condition="is">C:\Windows\system32\wermgr.exe -upload</CommandLine> <!--Windows:Windows error reporting/telemetry-->
@@ -382,7 +338,7 @@
 		<NetworkConnect onmatch="exclude">
 			<!--SECTION: Microsoft-->
 			<Image condition="begin with">C:\ProgramData\Microsoft\Windows Defender\Platform\</Image>
-			<Image condition="end with">\AppData\Local\Microsoft\Teams\current\Teams.exe</Image> <!--Microsoft: Teams-->
+			<Image condition="end with">AppData\Local\Microsoft\Teams\current\Teams.exe</Image> <!--Microsoft: Teams-->
 			<DestinationHostname condition="is">microsoft.com</DestinationHostname> <!--Microsoft:Update delivery-->
 			<DestinationHostname condition="end with">.microsoft.com</DestinationHostname> <!--Microsoft:Update delivery-->
 			<DestinationHostname condition="end with">microsoft.com.akadns.net</DestinationHostname> <!--Microsoft:Update delivery-->
@@ -446,6 +402,8 @@
 		<!--DATA: UtcTime, ProcessGuid, ProcessId, Image, ImageLoaded, Hashes, Signed, Signature, SignatureStatus-->
 	<RuleGroup name="" groupRelation="or">
 		<ImageLoad onmatch="include">
+			<ImageLoaded condition="begin with">C:\Users\Public\</ImageLoaded>
+			<ImageLoaded condition="begin with">C:\PerfLogs\</ImageLoaded>
 			<!--NOTE: Using "include" with no rules means nothing in this section will be logged-->
 		</ImageLoad>
 	</RuleGroup>
@@ -532,55 +490,40 @@
 			<TargetFilename name="T1165" condition="contains">\Startup\</TargetFilename> <!--Microsoft:Changes to user's auto-launched files and shortcuts-->
 			<TargetFilename name="OutlookAttachment" condition="contains">\Content.Outlook\</TargetFilename> <!--Microsoft:Outlook: attachments-->
 			<TargetFilename name="Downloads" condition="contains">\Downloads\</TargetFilename> <!--Downloaded files. Does not include "Run" files in IE-->
-			<TargetFilename name="T1176" condition="end with">.crx</TargetFilename> <!--Chrome extension-->
 			<TargetFilename condition="end with">.application</TargetFilename> <!--Microsoft:ClickOnce: [ https://blog.netspi.com/all-you-need-is-one-a-clickonce-love-story/ ] -->
 			<TargetFilename condition="end with">.appref-ms</TargetFilename> <!--Microsoft:ClickOnce application | Credit @ion-storm -->
-			<TargetFilename condition="end with">.ashx</TargetFilename> <!-- possible dropped webshell -->
-			<TargetFilename condition="end with">.asp</TargetFilename> <!-- possible dropped webshell -->
-			<TargetFilename condition="end with">.aspx</TargetFilename> <!-- possible dropped webshell -->
 			<TargetFilename condition="end with">.bat</TargetFilename> <!--Batch scripting-->
 			<TargetFilename condition="end with">.chm</TargetFilename>
 			<TargetFilename condition="end with">.cmd</TargetFilename> <!--Batch scripting: Batch scripts can also use the .cmd extension | Credit: @mmazanec -->
 			<TargetFilename condition="end with">.cmdline</TargetFilename> <!--Microsoft:dotNet: Executed by cvtres.exe-->
-			<TargetFilename condition="end with">.dll</TargetFilename> <!--Microsoft:Office:Word: Macro-->
-			<TargetFilename condition="end with">.dmg</TargetFilename> <!--Phishing-->
+			<TargetFilename name="T1176" condition="end with">.crx</TargetFilename> <!--Chrome extension-->
 			<TargetFilename condition="end with">.dmp</TargetFilename> <!--Process dumps [ (fr) http://blog.gentilkiwi.com/securite/mimikatz/minidump ] -->
 			<TargetFilename condition="end with">.docm</TargetFilename> <!--Microsoft:Office:Word: Macro-->
-			<TargetFilename condition="end with">.exe.log</TargetFilename> <!-- [ https://github.com/bitsadmin/nopowershell ] | Credit: @SBousseaden [ https://twitter.com/SBousseaden/status/1137493597769687040 ] -->
-			<TargetFilename condition="end with">.exe</TargetFilename> <!--Executable-->
-			<TargetFilename condition="end with">.hta</TargetFilename> <!--Scripting-->
-			<TargetFilename condition="end with">.img</TargetFilename> <!--Phishing-->
-			<TargetFilename condition="end with">.iso</TargetFilename> <!--Phishing-->
+			<TargetFilename name="DLL" condition="end with">.dll</TargetFilename> <!--Microsoft:Office:Word: Macro-->
+			<TargetFilename name="EXE" condition="end with">.exe</TargetFilename> <!--Executable-->
+			<TargetFilename name="ProcessHostingdotNETCode" condition="end with">.exe.log</TargetFilename> <!-- [ https://github.com/bitsadmin/nopowershell ] | Credit: @SBousseaden [ https://twitter.com/SBousseaden/status/1137493597769687040 ] -->
 			<TargetFilename condition="end with">.jar</TargetFilename> <!--Java applets-->
 			<TargetFilename condition="end with">.jnlp</TargetFilename> <!--Java applets-->
-			<TargetFilename condition="end with">.job</TargetFilename> <!--Scheduled task-->
 			<TargetFilename condition="end with">.jse</TargetFilename> <!--Scripting [ Example: https://www.sophos.com/en-us/threat-center/threat-analyses/viruses-and-spyware/Mal~Phires-C/detailed-analysis.aspx ] -->
-			<TargetFilename condition="end with">.jsp</TargetFilename> <!-- possible dropped webshell -->
-			<TargetFilename condition="end with">.jspx</TargetFilename> <!-- possible dropped webshell -->
-			<TargetFilename condition="end with">.kirbi</TargetFilename> <!--Mimikatz Kerberos Ticket Files-->
-			<TargetFilename condition="end with">.ocx</TargetFilename> <!--Microsoft:ActiveX-->
-			<TargetFilename condition="end with">.php</TargetFilename> <!-- possible dropped webshell -->
-			<TargetFilename condition="end with">.pl</TargetFilename> <!-- possible dropped webshell -->
-			<TargetFilename condition="end with">.ppt</TargetFilename> <!--Legacy Office files are often used for attacks-->
+			<TargetFilename condition="end with">.hta</TargetFilename> <!--Scripting-->
+			<TargetFilename condition="end with">.aspx</TargetFilename> <!--Scripting-->
+			<TargetFilename condition="end with">.asp</TargetFilename> <!--Scripting-->
+			<TargetFilename condition="end with">.job</TargetFilename> <!--Scheduled task-->
 			<TargetFilename condition="end with">.pptm</TargetFilename> <!--Microsoft:Office:Word: Macro-->
-			<TargetFilename condition="end with">.proj</TargetFilename><!--Microsoft:MSBuild:Script: [ https://twitter.com/subTee/status/885919612969394177 ] -->
 			<TargetFilename condition="end with">.ps1</TargetFilename> <!--PowerShell [ More information: http://www.hexacorn.com/blog/2014/08/27/beyond-good-ol-run-key-part-16/ ] -->
-			<TargetFilename condition="end with">.rar</TargetFilename> <!--Suspicious Archive Types-->
-			<TargetFilename condition="end with">.rtf</TargetFilename> <!--RTF files often 0day malware vectors when opened by Office-->
-			<TargetFilename condition="end with">.scr</TargetFilename> <!--System driver files-->
-			<TargetFilename condition="end with">.scf</TargetFilename>
 			<TargetFilename condition="end with">.sct</TargetFilename> <!--Scripting | Credit @bartblaze -->
-			<TargetFilename condition="end with">.sln</TargetFilename><!--Microsoft:MSBuild:Script: [ https://twitter.com/subTee/status/885919612969394177 ] -->
 			<TargetFilename condition="end with">.sys</TargetFilename> <!--System driver files-->
+			<TargetFilename condition="end with">.scr</TargetFilename> <!--System driver files-->
 			<TargetFilename condition="end with">.vbe</TargetFilename> <!--VisualBasicScripting-->
 			<TargetFilename condition="end with">.vbs</TargetFilename> <!--VisualBasicScripting-->
-			<TargetFilename condition="end with">.war</TargetFilename>
 			<TargetFilename condition="end with">.wsc</TargetFilename> <!--Scripting | Credit @bartblaze -->
 			<TargetFilename condition="end with">.wsf</TargetFilename> <!--Scripting | Credit @bartblaze -->
-			<TargetFilename condition="end with">.wsh</TargetFilename>
-			<TargetFilename condition="end with">.xls</TargetFilename> <!--Legacy Office files are often used for attacks-->
-			<TargetFilename condition="end with">.xls</TargetFilename><!--Microsoft [ https://medium.com/@threathuntingteam/msxsl-exe-and-wmic-exe-a-way-to-proxy-code-execution-8d524f642b75 ] -->
 			<TargetFilename condition="end with">.xlsm</TargetFilename> <!--Microsoft:Office:Word: Macro-->
+			<TargetFilename condition="end with">.ocx</TargetFilename> <!--Microsoft:ActiveX-->
+			<TargetFilename condition="end with">.kirbi</TargetFilename> <!--Mimikatz Kerberos Ticket Files-->
+			<TargetFilename condition="end with">proj</TargetFilename><!--Microsoft:MSBuild:Script: [ https://twitter.com/subTee/status/885919612969394177 ] -->
+			<TargetFilename condition="end with">.sln</TargetFilename><!--Microsoft:MSBuild:Script: [ https://twitter.com/subTee/status/885919612969394177 ] -->
+			<TargetFilename condition="end with">.xls</TargetFilename><!--Microsoft [ https://medium.com/@threathuntingteam/msxsl-exe-and-wmic-exe-a-way-to-proxy-code-execution-8d524f642b75 ] -->
 			<TargetFilename name="DefaultUserModified" condition="begin with">C:\Users\Default</TargetFilename> <!--Windows: Changes to default user profile-->
 			<TargetFilename condition="begin with">C:\Windows\system32\Drivers</TargetFilename> <!--Microsoft: Drivers dropped here-->
 			<TargetFilename condition="begin with">C:\Windows\SysWOW64\Drivers</TargetFilename> <!--Microsoft: Drivers dropped here-->
@@ -599,6 +542,17 @@
 			<!--Windows application compatibility-->
 			<TargetFilename condition="begin with">C:\Windows\AppPatch\Custom</TargetFilename> <!--Windows: Application compatibility shims [ https://www.fireeye.com/blog/threat-research/2017/05/fin7-shim-databases-persistence.html ] -->
 			<TargetFilename condition="contains">VirtualStore</TargetFilename> <!--Windows: UAC virtualization [ https://blogs.msdn.microsoft.com/oldnewthing/20150902-00/?p=91681 ] -->
+			<!--Exploitable file names-->
+			<TargetFilename condition="end with">.xls</TargetFilename> <!--Legacy Office files are often used for attacks-->
+			<TargetFilename condition="end with">.ppt</TargetFilename> <!--Legacy Office files are often used for attacks-->
+			<TargetFilename condition="end with">.rtf</TargetFilename> <!--RTF files often 0day malware vectors when opened by Office-->
+			<!-- Possible dropped webshells -->
+			<TargetFilename condition="end with">.php</TargetFilename> <!-- possible dropped webshell -->
+			<TargetFilename condition="end with">.asp</TargetFilename> <!-- possible dropped webshell -->
+			<TargetFilename condition="end with">.aspx</TargetFilename> <!-- possible dropped webshell -->
+			<TargetFilename condition="end with">.ashx</TargetFilename> <!-- possible dropped webshell -->
+			<TargetFilename condition="end with">.jsp</TargetFilename> <!-- possible dropped webshell -->
+			<TargetFilename condition="end with">.pl</TargetFilename> <!-- possible dropped webshell -->
 			<TargetFilename condition="contains">\SAM-20</TargetFilename> <!-- Default output of HiveNightmare / SeriousSAM tools -->
 			<TargetFilename condition="contains">\SAM-haxx</TargetFilename> <!-- Default output of HiveNightmare / SeriousSAM tools -->
 			<TargetFilename condition="contains">\Sam.save</TargetFilename> <!-- Default output of HiveNightmare / SeriousSAM tools -->
@@ -687,7 +641,7 @@
 			<!--RDP-->
 			<TargetObject name="RDP port change" condition="end with">Control\Terminal Server\WinStations\RDP-Tcp\PortNumber</TargetObject> <!--Windows: RDP port change under Control [ https://blog.menasec.net/2019/02/of-rdp-hijacking-part1-remote-desktop.html ]-->
 			<TargetObject name="RDP port change" condition="end with">Control\Terminal Server\fSingleSessionPerUser</TargetObject> <!--Windows: Allow same user to have mutliple RDP sessions, to hide from admin being impersonated-->
-			<TargetObject name="ModifyRemoteDesktopState" condition="end with">\fDenyTSConnections</TargetObject> <!--Windows: Attacker turning on RDP-->
+			<TargetObject name="ModifyRemoteDesktopState" condition="end with">fDenyTSConnections</TargetObject> <!--Windows: Attacker turning on RDP-->
 			<TargetObject condition="end with">LastLoggedOnUser</TargetObject> <!--Windows: Changing last-logged in user-->
 			<TargetObject name="ModifyRemoteDesktopPort" condition="end with">RDP-tcp\PortNumber</TargetObject> <!--Windows: Changing RDP port to evade IDS-->
 			<TargetObject condition="end with">Services\PortProxy\v4tov4</TargetObject> <!--Windows: Changing RDP port to evade IDS-->
@@ -769,7 +723,7 @@
 			<TargetObject name="T1089,Tamper-Defender" condition="end with">\DisableAntiSpyware</TargetObject> <!--Windows:Defender: State modified via registry-->
 			<TargetObject name="T1089,Tamper-Defender" condition="end with">\DisableAntiVirus</TargetObject> <!--Windows:Defender: State modified via registry-->
 			<TargetObject name="T1089,Tamper-Defender" condition="end with">\SpynetReporting</TargetObject> <!--Windows:Defender: State modified via registry-->
-			<TargetObject name="T1089,Tamper-Defender" condition="end with">\DisableRealtimeMonitoring</TargetObject> <!--Windows:Defender: State modified via registry-->
+			<TargetObject name="T1089,Tamper-Defender" condition="end with">DisableRealtimeMonitoring</TargetObject> <!--Windows:Defender: State modified via registry-->
 			<TargetObject name="T1089,Tamper-Defender" condition="end with">\DisableBehaviorMonitoring</TargetObject> <!--Windows:Defender: State modified via registry-->
 			<TargetObject name="T1089,Tamper-Defender" condition="end with">\DisableIOAVProtection</TargetObject> <!--Windows:Defender: State modified via registry-->
 			<TargetObject name="T1089,Tamper-Defender" condition="end with">\DisableOnAccessProtection</TargetObject> <!--Windows:Defender: State modified via registry-->
@@ -812,7 +766,7 @@
 			<TargetObject condition="contains">\Keyboard Layout\Preload</TargetObject> <!--Microsoft:Windows: Keyboard layout loaded into user session [ https://renenyffenegger.ch/notes/Windows/registry/tree/HKEY_CURRENT_USER/Keyboard-Layout/Preload/index ] -->
 			<TargetObject condition="contains">\Keyboard Layout\Substitutes</TargetObject> <!--Microsoft:Windows: Keyboard layout loaded into user session [ https://renenyffenegger.ch/notes/Windows/registry/tree/HKEY_CURRENT_USER/Keyboard-Layout/Preload/index ] -->
 			<!--Suspicious sources-->
-			<Image name="Suspicious,ImageBeginWithBackslash" condition="end with">\regedit.exe</Image> <!--Users and helpdesk staff making system modifications -->
+			<Image name="Suspicious,ImageBeginWithBackslash" condition="end with">regedit.exe</Image> <!--Users and helpdesk staff making system modifications -->
 			<Image name="Suspicious,ImageBeginWithBackslash" condition="begin with">\</Image> <!--Devices and VSC shouldn't be executing changes | Credit: @SBousseaden @ionstorm @neu5ron @PerchedSystems [ https://twitter.com/SwiftOnSecurity/status/1133167323991486464 ] -->
 			<TargetObject condition="begin with">HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\</TargetObject> <!--Microsoft:Windows:UAC: Detect malware changes to UAC prompt level-->
 			<TargetObject condition="begin with">HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\</TargetObject> <!--Microsoft:Defender: Detect changes to Defender administrative settings to monitor for disablement-->
@@ -965,16 +919,6 @@
 				<PipeName condition="begin with">\postex_ssh_</PipeName>
 				<PipeName condition="begin with">\status_</PipeName>
 				<PipeName condition="begin with">\msagent_</PipeName>
-				<!-- more named pipe names https://redcanary.com/threat-detection-report/threats/cobalt-strike/ -->
-				<PipeName condition="begin with">\mojo_</PipeName>
-				<PipeName condition="begin with">\interprocess_</PipeName>
-				<PipeName condition="begin with">\samr_</PipeName>
-				<PipeName condition="begin with">\netlogon_</PipeName>
-				<PipeName condition="begin with">\srvsvc_</PipeName>
-				<PipeName condition="begin with">\lsarpc_</PipeName>
-				<PipeName condition="begin with">\wkssvc_</PipeName>
-				<!-- Havoc C2 default -->
-				<PipeName condition="begin with">\demon_pipe</PipeName>
 				<!-- Malleable C2 profiles https://svch0st.medium.com/guide-to-named-pipes-and-hunting-for-cobalt-strike-pipes-dc46b2c5f575 -->
 				<!-- some of these are not exact matches, but the corresponding Sigma rules use Regexp to match exactly -->
 				<PipeName condition="begin with">\mojo.5688.8052.183894939787088877</PipeName>
@@ -1003,6 +947,10 @@
 				<PipeName condition="begin with">\bc367</PipeName> <!-- Pacifier - https://download.bitdefender.com/resources/files/News/CaseStudies/study/115/Bitdefender-Whitepaper-PAC-A4-en-EN1.pdf -->
 				<PipeName condition="begin with">\bc31a7</PipeName> <!-- Pacifier - https://download.bitdefender.com/resources/files/News/CaseStudies/study/115/Bitdefender-Whitepaper-PAC-A4-en-EN1.pdf -->
 				<PipeName condition="begin with">\testPipe</PipeName> <!-- Emissary Panda Hyerbri - https://unit42.paloaltonetworks.com/emissary-panda-attacks-middle-east-government-sharepoint-servers/ -->
+				<Rule groupRelation="and"> <!-- would be noisy otherwise as \Winsock2\CatalogchangeListener-???-0 is a legitimate pipe name -->
+					<PipeName condition="begin with">\Winsock2\CatalogChangeListener-</PipeName>
+					<PipeName condition="end with">-0,</PipeName>
+				</Rule>
 				<!-- these are standard pipes that appear frequently but the Sigma rules use RE to match on malicious pipes that use the common names as a prefix -->
 				<PipeName condition="begin with">\scerpc</PipeName>
 				<PipeName condition="begin with">\ntsvcs</PipeName>
@@ -1055,10 +1003,9 @@
 
 		<!--OPERATIONS:	Most DNS traffic is web advertising. To significantly reduce DNS queries and malware ads, enable client-side advertising filtering via Group Policy. This is easy.
 				Internet Explorer: https://decentsecurity.com/adblocking-for-internet-explorer-deployment/
-				Chrome: https://support.google.com/chrome/a/answer/187202?hl=en#zippy=%2Cwindows
-						https://decentsecurity.com/ublockorigin-deployment-enterprise/
-				Firefox: https://github.com/mozilla/policy-templates/blob/master/windows/en-US/firefox.adml
-				Also note, this configuration is designed for United States computers. Your country's users will may need customization to reduce noise.
+				Chrome: https://decentsecurity.com/ublock-for-google-chrome-deployment/
+				Firefox: ToDo
+						Also note, this configuration is designed for United States computers. Your country's users will may need customization to reduce noise.
 			-->
 
 		<!--CONFIG:	DNS poisoning is an issue during threat investigations. Try to only exclude ROUTINE system-level queries you know are strongly validated with HTTPS or code signing.-->
@@ -1088,7 +1035,6 @@
 			<QueryName condition="is">localhost</QueryName>
 			<!--Microsoft-->
 			<QueryName condition="end with">-pushp.svc.ms</QueryName> <!--Microsoft: Doesn't appear to host customer content or subdomains-->
-			<QueryName condition="end with">.a-msedge.net</QueryName> <!--Microsoft: Doesn't appear to host customer content or subdomains-->
 			<QueryName condition="end with">.b-msedge.net</QueryName> <!--Microsoft: Doesn't appear to host customer content or subdomains-->
 			<QueryName condition="end with">.bing.com</QueryName> <!-- Microsoft | Microsoft default exclusion -->
 			<QueryName condition="end with">.hotmail.com</QueryName> <!--Microsoft | Microsoft default exclusion-->
@@ -1102,7 +1048,6 @@
 			<QueryName condition="end with">.msedge.net</QueryName> <!--Microsoft: Doesn't appear to host customer content or subdomains-->
 			<QueryName condition="end with">.msn.com</QueryName> <!--Microsoft | Microsoft default exclusion-->
 			<QueryName condition="end with">.msocdn.com</QueryName> <!--Microsoft-->
-			<QueryName condition="end with">.msftncsi.com</QueryName> <!--Microsoft: Network Connectivity Indicator-->
 			<QueryName condition="end with">.skype.com</QueryName> <!--Microsoft | Microsoft default exclusion-->
 			<QueryName condition="end with">.skype.net</QueryName> <!--Microsoft | Microsoft default exclusion-->
 			<QueryName condition="end with">.windows.com</QueryName> <!--Microsoft-->
@@ -1319,6 +1264,7 @@
 		-->
 
 		<!--DATA: RuleName, UtcTime, ProcessGuid, ProcessId, User, Image, TargetFilename, Hashes, IsExecutable, Archived -->
+
 	<!--
 	<RuleGroup name="" groupRelation="or">
 		<FileDelete onmatch="include">
@@ -1332,6 +1278,7 @@
 			An example of what could be a production usage on restricted desktops is provided below, but it is commented-out. -->
 
 		<!--DATA: EventType, UtcTime, ProcessGuid, ProcessId, Image, Session, ClientInfo, Hashes, Archived -->
+
 	<!--
 	<RuleGroup name="" groupRelation="or">
 		<ClipboardChange onmatch="include">
@@ -1340,7 +1287,7 @@
 			<Image condition="end with">powershell.exe</Image>
 			<Image condition="end with">rdpclip.exe</Image>
 		</ClipboardChange>
-	</RuleGroup> 
+	</RuleGroup>
 	-->
 
 	<!--SYSMON EVENT ID 25 : PROCESS TAMPERING [ProcessTampering]-->
@@ -1368,6 +1315,12 @@
 		-->
 
 		<!--DATA: RuleName, UtcTime, ProcessGuid, ProcessId, User, Image, TargetFilename, Hashes, IsExecutable -->
+
+	<!--SYSMON EVENT ID 255 : ERROR-->
+		<!--"This event is generated when an error occurred within Sysmon. They can happen if the system is under heavy load
+			and certain tasked could not be performed or a bug exists in the Sysmon service. You can report any bugs on the
+			Sysinternals forum or over Twitter (@markrussinovich)."-->
+		<!--Cannot be filtered.-->
 
 
 	<!--SYSMON EVENT ID 27 : FILE BLOCK [FileBlockExecutable]-->
@@ -1526,12 +1479,6 @@
 			<Image condition="image">mspaint.exe</Image>
 		</FileBlockExecutable>
 	</RuleGroup>
-
-	<!--SYSMON EVENT ID 255 : ERROR-->
-		<!--"This event is generated when an error occurred within Sysmon. They can happen if the system is under heavy load
-			and certain tasked could not be performed or a bug exists in the Sysmon service. You can report any bugs on the
-			Sysinternals forum or over Twitter (@markrussinovich)."-->
-		<!--Cannot be filtered.-->
 
 	</EventFiltering>
 </Sysmon>
