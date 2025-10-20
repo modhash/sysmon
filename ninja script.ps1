@@ -206,7 +206,7 @@ try {
     
     # Compare new config hash against stored hash
     $newHash = Get-Sha256Hash $NewCfg
-    $storedHash = if (Test-Path $HashFile) { Get-Content $HashFile -Raw -ErrorAction SilentlyContinue } else { $null }
+    $storedHash = if (Test-Path $HashFile) { (Get-Content $HashFile -Raw -ErrorAction SilentlyContinue).Trim() } else { $null }
     
     if ($newHash -and ($newHash -ne $storedHash)) {
       Write-Output "[+] Config changed. Updating..."
