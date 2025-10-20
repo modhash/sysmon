@@ -1,4 +1,4 @@
-<parameter name="newString">#==============================================================================
+#==============================================================================
 # Sysmon Deployment Script for Ninja RMM
 #==============================================================================
 # Description: Idempotent Sysmon installer/updater with signature validation
