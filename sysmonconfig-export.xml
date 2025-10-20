@@ -349,8 +349,9 @@
 			<!--SECTION: Microsoft-->
 			<Image condition="begin with">C:\ProgramData\Microsoft\Windows Defender\Platform\</Image>
 			<Image condition="end with">AppData\Local\Microsoft\Teams\current\Teams.exe</Image> <!--Microsoft: Teams-->
-			<Image condition="end with">\AppData\Local\Programs\Cisco Spark\CiscoCollabHost.exe</Image> <!--Cisco: Spark-->
+			<Image condition="end with">AppData\Local\Programs\Cisco Spark\CiscoCollabHost.exe</Image> <!--Cisco: Spark-->
 			<Image condition="end with">AppData\Local\CiscoSparkLauncher\CiscoCollabHost.exe</Image> <!--Cisco: Webex-->
+			<Image condition="contains">\Cisco Spark\CiscoCollabHost.exe</Image> <!--Cisco: Spark - Block all network alerts-->
 			<DestinationHostname condition="is">microsoft.com</DestinationHostname> <!--Microsoft:Update delivery-->
 			<DestinationHostname condition="end with">.microsoft.com</DestinationHostname> <!--Microsoft:Update delivery-->
 			<DestinationHostname condition="end with">microsoft.com.akadns.net</DestinationHostname> <!--Microsoft:Update delivery-->
