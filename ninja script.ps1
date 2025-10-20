@@ -1,13 +1,13 @@
 #==============================================================================
 # Sysmon Deployment Script for Ninja RMM
 #==============================================================================
-# Description: Idempotent Sysmon installer/updater with signature validation
+# Description: Installs or updates Sysmon with the latest configuration
 # Features:
 #   - Installs Sysmon if not present
-#   - Updates config only when changed (hash comparison)
-#   - Verifies Microsoft signature on every run
-#   - Cleans up old GitHub-based installation artifacts
-#   - Exit 0 on success, 1 on failure (Ninja compatible)
+#   - Forces config update on every run (idempotent)
+#   - Verifies Microsoft signature on binary
+#   - Cleans up legacy installation artifacts
+#   - Exit 0 on success, 1 on failure
 #==============================================================================
 
 $ErrorActionPreference = 'Stop'
@@ -17,9 +17,7 @@ $SysmonUrl = 'https://live.sysinternals.com/Sysmon64.exe'
 $ConfigUrl = 'https://raw.githubusercontent.com/modhash/sysmon/main/sysmonconfig-export.xml'
 $WorkDir   = 'C:\ProgramData\sysmon'
 $SysmonExe = Join-Path $WorkDir 'Sysmon64.exe'
-$NewCfg    = Join-Path $WorkDir 'sysmonconfig-export.xml'
-$HashFile  = Join-Path $WorkDir 'config.hash'
-$SysmonUpdateDays = 30  # Re-download Sysmon binary every X days
+$ConfigFile = Join-Path $WorkDir 'sysmonconfig-export.xml'
 #endregion
 
 #region Initialization
@@ -40,6 +38,7 @@ function Download($Url, $Dest) {
     if (-not (Test-Path $Dest)) {
       throw "File not created after download"
     }
+    Write-Output "[✓] Downloaded to: $Dest"
   }
   catch {
     Remove-Item $Dest -Force -ErrorAction SilentlyContinue
@@ -47,47 +46,25 @@ function Download($Url, $Dest) {
   }
 }
 
-function Get-Sha256Hash($Path) {
-  if (Test-Path $Path) { 
-    (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToUpperInvariant() 
-  } else { 
-    $null 
-  }
-}
-
-function Test-SysmonBinaryNeedsUpdate {
-  if (-not (Test-Path $SysmonExe)) {
-    Write-Output "[+] Sysmon binary not found, will download"
-    return $true
-  }
-  
-  # Check file age
-  $fileAge = (Get-Item $SysmonExe).LastWriteTime
-  $daysSinceUpdate = (New-TimeSpan -Start $fileAge -End (Get-Date)).Days
-  
-  if ($daysSinceUpdate -ge $SysmonUpdateDays) {
-    Write-Output "[+] Sysmon binary is $daysSinceUpdate days old, will update"
-    return $true
-  }
-  
-  return $false
-}
-
 function Test-ValidXml($Path) {
   try {
+    Write-Output "[+] Validating XML file: $Path"
     $xml = [xml](Get-Content $Path -Raw -ErrorAction Stop)
     if ($xml.Sysmon -or $xml.SelectSingleNode("//Sysmon")) {
+      Write-Output "[✓] XML is a valid Sysmon config"
       return $true
     }
+    Write-Output "[X] XML is not a valid Sysmon config (missing <Sysmon> root element)"
     return $false
   }
   catch {
+    Write-Output "[X] XML validation failed: $($_.Exception.Message)"
     return $false
   }
 }
 
 function Test-MicrosoftSignature($Path) {
-  Write-Output "[+] Verifying digital signature..."
+  Write-Output "[+] Verifying digital signature for: $Path"
   try {
     $sig = Get-AuthenticodeSignature -FilePath $Path -ErrorAction Stop
     if ($sig.Status -ne 'Valid') {
@@ -106,23 +83,33 @@ function Test-MicrosoftSignature($Path) {
   }
 }
 
-function Remove-OldGitHubInstallation {
-  Write-Output "[+] Cleaning up old installation artifacts..."
+function Remove-LegacyInstallation {
+  Write-Output "[+] Checking for legacy installation artifacts..."
+  $cleanupPerformed = $false
   
   # Remove legacy scheduled task
   $task = Get-ScheduledTask -TaskName 'Update_Sysmon_Rules' -ErrorAction SilentlyContinue
   if ($task) {
-    Write-Output "    Removing scheduled task: Update_Sysmon_Rules"
+    Write-Output "    [→] Removing scheduled task: Update_Sysmon_Rules"
     Unregister-ScheduledTask -TaskName 'Update_Sysmon_Rules' -Confirm:$false -ErrorAction SilentlyContinue
+    $cleanupPerformed = $true
   }
   
   # Remove legacy batch files
-  @('Auto_Update.bat', 'Install Sysmon.bat') | ForEach-Object {
-    $file = Join-Path $WorkDir $_
-    if (Test-Path $file) {
-      Write-Output "    Removing: $_"
-      Remove-Item $file -Force -ErrorAction SilentlyContinue
+  $legacyFiles = @('Auto_Update.bat', 'Install Sysmon.bat')
+  foreach ($file in $legacyFiles) {
+    $filePath = Join-Path $WorkDir $file
+    if (Test-Path $filePath) {
+      Write-Output "    [→] Removing legacy file: $file"
+      Remove-Item $filePath -Force -ErrorAction SilentlyContinue
+      $cleanupPerformed = $true
     }
+  }
+  
+  if ($cleanupPerformed) {
+    Write-Output "[✓] Legacy installation artifacts cleaned up"
+  } else {
+    Write-Output "[=] No legacy artifacts found"
   }
 }
 
@@ -131,46 +118,49 @@ function Remove-OldGitHubInstallation {
 #region Main Execution
 
 try {
-  # Step 1: Clean up old GitHub-based installation
-  Remove-OldGitHubInstallation
+  Write-Output "=================================================="
+  Write-Output "Starting Sysmon Deployment Script"
+  Write-Output "=================================================="
   
-  # Step 2: Download and validate configuration
-  Download $ConfigUrl $NewCfg
-  if (-not (Test-ValidXml $NewCfg)) {
-    Remove-Item $NewCfg -Force -ErrorAction SilentlyContinue
-    throw "Downloaded config is not valid Sysmon XML"
+  # Step 1: Clean up legacy installation method
+  Remove-LegacyInstallation
+  
+  # Step 2: Determine config source and copy to working directory
+  $LocalConfigPath = Join-Path $PSScriptRoot 'sysmonconfig-export.xml'
+  if (Test-Path $LocalConfigPath) {
+    Write-Output "[+] Found local config file: $LocalConfigPath"
+    Write-Output "[+] Copying to working directory..."
+    Copy-Item -Path $LocalConfigPath -Destination $ConfigFile -Force
+  } else {
+    Write-Output "[!] Local config not found at: $LocalConfigPath"
+    Write-Output "[+] Downloading from GitHub..."
+    Download $ConfigUrl $ConfigFile
+  }
+
+  # Step 3: Validate configuration
+  if (-not (Test-ValidXml $ConfigFile)) {
+    Remove-Item $ConfigFile -Force -ErrorAction SilentlyContinue
+    throw "Configuration file is not valid Sysmon XML"
   }
   
-  # Step 3: Download or update Sysmon executable
-  if (Test-SysmonBinaryNeedsUpdate) {
-    Write-Output "[+] Downloading Sysmon binary..."
-    $TempExe = "$SysmonExe.tmp"
-    Download $SysmonUrl $TempExe
+  # Step 4: Verify Sysmon executable exists
+  if (-not (Test-Path $SysmonExe)) {
+    Write-Output "[+] Sysmon binary not found, downloading..."
+    Download $SysmonUrl $SysmonExe
     
-    # Verify signature before replacing existing binary
-    if (-not (Test-MicrosoftSignature $TempExe)) {
-      Remove-Item $TempExe -Force -ErrorAction SilentlyContinue
+    # Verify signature
+    if (-not (Test-MicrosoftSignature $SysmonExe)) {
+      Remove-Item $SysmonExe -Force -ErrorAction SilentlyContinue
       throw "Downloaded Sysmon binary failed signature verification"
     }
-    
-    # Replace existing binary
-    if (Test-Path $SysmonExe) {
-      Remove-Item $SysmonExe -Force -ErrorAction SilentlyContinue
-    }
-    Move-Item $TempExe $SysmonExe -Force
-    Write-Output "[✓] Sysmon binary updated"
   } else {
-    Write-Output "[=] Sysmon binary is current"
-  }
-  
-  # Step 4: Verify executable signature (security critical)
-  if (-not (Test-Path $SysmonExe)) {
-    throw "Sysmon executable not found after download/update process"
-  }
-  if (-not (Test-MicrosoftSignature $SysmonExe)) {
-    # If the binary on disk is invalid, remove it to force a re-download on the next run.
-    Remove-Item $SysmonExe -Force -ErrorAction SilentlyContinue
-    throw "Sysmon executable failed signature verification"
+    Write-Output "[=] Sysmon binary found at: $SysmonExe"
+    
+    # Verify signature of existing binary
+    if (-not (Test-MicrosoftSignature $SysmonExe)) {
+      Remove-Item $SysmonExe -Force -ErrorAction SilentlyContinue
+      throw "Existing Sysmon binary failed signature verification"
+    }
   }
 
   # Step 5: Install or update Sysmon
@@ -178,8 +168,8 @@ try {
 
   if (-not $svc) {
     #--- Fresh Installation ---
-    Write-Output "[+] Installing Sysmon..."
-    & $SysmonExe -accepteula -i $NewCfg
+    Write-Output "[+] Sysmon service not found. Starting fresh installation..."
+    & $SysmonExe -accepteula -i $ConfigFile
     
     if ($LASTEXITCODE -ne 0) {
       throw "Installation failed with exit code $LASTEXITCODE"
@@ -188,57 +178,47 @@ try {
     Start-Sleep -Seconds 2
     $svcCheck = Get-Service Sysmon64 -ErrorAction Stop
     if ($svcCheck.Status -ne 'Running') {
-      throw "Service exists but is not running"
+      throw "Service exists but is not running after install"
     }
+    Write-Output "[✓] Service is running"
     
     # Configure automatic recovery
+    Write-Output "[+] Configuring service auto-recovery..."
     & sc.exe failure Sysmon64 actions= restart/10000/restart/10000// reset= 120 | Out-Null
-    
-    # Store hash of applied config
-    $configHash = Get-Sha256Hash $NewCfg
-    Set-Content -Path $HashFile -Value $configHash -Force
     
     Write-Output "[✓] Sysmon installed successfully"
   }
   else {
     #--- Update Existing Installation ---
-    Write-Output "[=] Sysmon detected. Checking for config changes..."
+    Write-Output "[=] Sysmon service detected. Forcing configuration update..."
     
-    # Compare new config hash against stored hash
-    $newHash = Get-Sha256Hash $NewCfg
-    $storedHash = if (Test-Path $HashFile) { (Get-Content $HashFile -Raw -ErrorAction SilentlyContinue).Trim() } else { $null }
+    & $SysmonExe -c $ConfigFile
     
-    if ($newHash -and ($newHash -ne $storedHash)) {
-      Write-Output "[+] Config changed. Updating..."
-      Write-Output "    Old hash: $storedHash"
-      Write-Output "    New hash: $newHash"
-      
-      & $SysmonExe -c $NewCfg
-      
-      if ($LASTEXITCODE -ne 0) {
-        throw "Config update failed with exit code $LASTEXITCODE"
-      }
-      
-      # Verify service still running
-      Start-Sleep -Seconds 1
-      $svcCheck = Get-Service Sysmon64 -ErrorAction Stop
-      if ($svcCheck.Status -ne 'Running') {
-        throw "Service stopped after config update"
-      }
-      
-      # Store new hash
-      Set-Content -Path $HashFile -Value $newHash -Force
-      
-      Write-Output "[✓] Config updated successfully"
-    } else {
-      Write-Output "[=] Config unchanged. No action needed."
+    if ($LASTEXITCODE -ne 0) {
+      throw "Config update failed with exit code $LASTEXITCODE"
     }
+    
+    # Verify service still running
+    Start-Sleep -Seconds 1
+    $svcCheck = Get-Service Sysmon64 -ErrorAction Stop
+    if ($svcCheck.Status -ne 'Running') {
+      throw "Service stopped after config update"
+    }
+    Write-Output "[✓] Service is still running"
+    
+    Write-Output "[✓] Config updated successfully"
   }
 
+  Write-Output "=================================================="
+  Write-Output "Sysmon Deployment Script Finished Successfully"
+  Write-Output "=================================================="
   exit 0
 }
 catch {
-  Write-Error "[X] Error: $($_.Exception.Message)"
+  Write-Error "[X] FATAL ERROR: $($_.Exception.Message)"
+  Write-Output "=================================================="
+  Write-Output "Sysmon Deployment Script Finished with Errors"
+  Write-Output "=================================================="
   exit 1
 }
 
