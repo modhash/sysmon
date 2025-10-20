@@ -165,9 +165,10 @@ try {
   
   # Step 4: Verify executable signature (security critical)
   if (-not (Test-Path $SysmonExe)) {
-    throw "Sysmon executable not found"
+    throw "Sysmon executable not found after download/update process"
   }
   if (-not (Test-MicrosoftSignature $SysmonExe)) {
+    # If the binary on disk is invalid, remove it to force a re-download on the next run.
     Remove-Item $SysmonExe -Force -ErrorAction SilentlyContinue
     throw "Sysmon executable failed signature verification"
   }
